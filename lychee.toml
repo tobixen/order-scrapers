@@ -1,7 +1,14 @@
 # Link checker config (auto-discovered by lychee + the pre-commit hook).
 # AliExpress / shop product URLs frequently 403/429 bots; don't fail on those.
 accept = [200, 403, 429]
+
+# Captured fixtures are scraped shop HTML full of root-relative links; they are
+# test data, not documentation, so don't link-check them.
+exclude_path = ["tests/fixtures"]
+
 exclude = [
+  # PyPI project page only exists once the first release is published.
+  "^https?://pypi\\.org/p/order-scrapers",
   "^https?://(www\\.)?aliexpress\\.com/",
   "^https?://acs\\.aliexpress\\.com/",
   "^https?://www\\.svb24\\.com/",
