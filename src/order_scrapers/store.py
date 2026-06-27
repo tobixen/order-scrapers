@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -69,17 +69,21 @@ def sync(
     stored record and rewrites those whose :func:`content` changed. Returns a
     process exit code (always 0 here, for ``raise SystemExit(sync(...))``).
     """
-    fetched_at = fetched_at or datetime.now(timezone.utc).isoformat()
+    fetched_at = fetched_at or datetime.now(UTC).isoformat()
     describe = describe or (lambda r: str(r.get(key)))
     if update_all:
-        return _update_all(records, output, key=key, source=source,
-                           fetched_at=fetched_at, dry_run=dry_run, describe=describe)
-    return _append(records, output, key=key, source=source,
-                  fetched_at=fetched_at, dry_run=dry_run, describe=describe)
+        return _update_all(
+            records, output, key=key, source=source, fetched_at=fetched_at, dry_run=dry_run, describe=describe
+        )
+    return _append(records, output, key=key, source=source, fetched_at=fetched_at, dry_run=dry_run, describe=describe)
 
 
 def _stamp(rec: dict, *, source: str, fetched_at: str, updated: bool = False) -> dict:
-    rec = {**rec, "_source": source, "_fetchedAt": fetched_at}
+    # Respect a per-record _source if the shop set one (e.g. svb24's
+    # "list"/"detail"/"invoice" enrichment level); otherwise use the default.
+    rec = {**rec}
+    rec.setdefault("_source", source)
+    rec["_fetchedAt"] = fetched_at
     if updated:
         rec["_updatedAt"] = fetched_at
     return rec

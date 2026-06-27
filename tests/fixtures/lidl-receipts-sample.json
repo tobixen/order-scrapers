@@ -1,0 +1,33 @@
+[
+  {
+    "id": "R1",
+    "purchase_date": "2026.03.27",
+    "total_price": null,
+    "total_price_no_saving": "12,50",
+    "saved_amount": "1,20",
+    "store": "Teststad – Test Boulevard 1",
+    "store_details": {"name": "Teststad", "address": "Test Boulevard 1", "postalCode": "9000", "locality": "Teststad"},
+    "items": [
+      {"art_id": "111", "name": "TEST MILK", "price": "1,25", "quantity": "2", "unit": "stk"},
+      {"art_id": "222", "name": "TEST BREAD 1,5kg", "price": "2,00", "quantity": "1", "unit": "stk"}
+    ]
+  },
+  {
+    "id": "R2",
+    "purchase_date": "2026.04.01",
+    "total_price": "5,00",
+    "total_price_no_saving": null,
+    "store": "Teststad",
+    "store_details": {},
+    "items": [
+      {"art_id": "333", "name": "TEST EGGS", "price": "3,30", "quantity": "1", "unit": "stk"}
+    ]
+  },
+  {
+    "id": "R2",
+    "purchase_date": "2026.04.01",
+    "total_price": "5,00",
+    "store": "Teststad duplicate (must be de-duped)",
+    "items": []
+  }
+]
