@@ -1,0 +1,38 @@
+name: Publish to PyPI
+
+# Publishing is opt-in: this only runs for tags like v1.2.3 AND requires a
+# "pypi" environment with trusted publishing configured. Until that is set up
+# (and an initial v* tag pushed), it is effectively a no-op.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/order-scrapers
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install build hatch-vcs
+
+      - name: Build package
+        run: python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

@@ -1,0 +1,22 @@
+# Build / packaging
+dist/
+build/
+*.egg-info/
+src/order_scrapers/_version.py
+
+# Caches
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.lycheecache/
+
+# Virtualenvs
+.venv/
+venv/
+
+# Local data captures must never be committed — the history lives in ~/regnskap.
+# Keep stray exports/captures out of the repo by accident:
+*.jsonl
+aliexpress-order-api-capture*.json
+lidl_receipts*.json
+lidl_cookies*.json

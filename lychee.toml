@@ -1,0 +1,10 @@
+# Link checker config (auto-discovered by lychee + the pre-commit hook).
+# AliExpress / shop product URLs frequently 403/429 bots; don't fail on those.
+accept = [200, 403, 429]
+exclude = [
+  "^https?://(www\\.)?aliexpress\\.com/",
+  "^https?://acs\\.aliexpress\\.com/",
+  "^https?://www\\.svb24\\.com/",
+  "^https?://www\\.decathlon\\.",
+  "^https?://www\\.lidl\\.",
+]
