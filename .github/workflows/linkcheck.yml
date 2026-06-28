@@ -43,15 +43,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # GitHub caps issue bodies at 65536 chars; a large lychee report
+          # otherwise makes gh issue create/edit fail with "Body is too long".
+          BODY=./lychee/out.md
+          LIMIT=65536
+          if [ "$(wc -c < "$BODY")" -gt "$LIMIT" ]; then
+            NOTE=$'\n\n_Report truncated to fit GitHub'"'"'s 65536-character issue-body limit; see the workflow job summary for the full list._'
+            head -c "$((LIMIT - ${#NOTE}))" "$BODY" > "${BODY}.trunc"
+            printf '%s' "$NOTE" >> "${BODY}.trunc"
+            mv "${BODY}.trunc" "$BODY"
+          fi
           ISSUES=$(gh issue list --label "report" --state open --json number --jq '.[].number' | sort -n)
           CANON=$(printf '%s\n' "$ISSUES" | head -1)
           for n in $(printf '%s\n' "$ISSUES" | tail -n +2); do
             gh issue close "$n" --comment "Duplicate of #${CANON} - auto-closed by the link checker."
           done
           if [ -n "$CANON" ]; then
-            gh issue edit "$CANON" --body-file ./lychee/out.md
+            gh issue edit "$CANON" --body-file "$BODY"
           else
-            gh issue create --title "Link Checker Report" --body-file ./lychee/out.md --label "report"
+            gh issue create --title "Link Checker Report" --body-file "$BODY" --label "report"
           fi
       - name: Close Link Checker issue if all links are healthy
         if: steps.lychee.outputs.exit_code == 0 && github.ref == 'refs/heads/main'

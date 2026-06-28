@@ -8,7 +8,7 @@ src/order_scrapers/_version.py
 __pycache__/
 .pytest_cache/
 .ruff_cache/
-.lycheecache/
+.lycheecache
 
 # Virtualenvs
 .venv/
