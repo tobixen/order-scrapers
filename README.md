@@ -1,20 +1,20 @@
 # order-scrapers
 
-Append-only **order/purchase history builders** for various web shops. Each
-shop command turns a logged-in browser session (or an exported capture) into a
-de-duplicated JSONL history you can feed into bookkeeping/analysis.
+Append-only **order/purchase history builders** for various shops.  Orders are downloaded from the web and stored locally in jsonl-files.
 
-| Command | Shop | How it gets data |
-|---------|------|------------------|
-| `svb24-history` | svb24.com | replays the logged-in session (browser cookies, `curl_cffi` past Cloudflare); parses order HTML + invoice PDFs |
-| `decathlon-history` | decathlon.* | replays the `web-engage` JSON API with browser cookies |
-| `aliexpress-history` | aliexpress.com | ingests a JSON capture of the `mtop` order-list API (see [`userscripts/`](userscripts/)) |
-| `lidl-history` | lidl.* | ingests the `lidl_receipts.json` produced by [shopping-analyzer](https://github.com/tobixen/shopping-analyzer) |
+* No credentials stored.
+  * For most shops, user should log into the web shop through the browser, the import script will then catch the browser session cookie and use it.
+  * Aliexpress was non-trivial.  It's necessary to run a browser-side script to capture the data from the API-calls, and then run the python script to convert this data to jsonl.
+  * Lidl depends on my fork of the [shopping-analyzer](https://github.com/tobixen/shopping-analyzer) (I didn't want to copy the code into this project - though I particularly opted for the AGPL license, making this an option)
 
-All four share one tested JSONL store with the same `--update-all` / `--dry-run`
-semantics. **No credentials are embedded**: cookies are read from your browser
-at runtime, and the actual history files stay wherever you point `-o` (they are
-*not* part of this repo).
+## Shops supported as of 2026-06
+
+* svb24.com
+* decathlon
+* aliexpress.com
+* lidl
+
+More to come.  Pull requests adding more shops are welcome.
 
 ## Installation
 
