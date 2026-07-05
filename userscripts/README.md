@@ -9,6 +9,15 @@ hooks `fetch`/`XHR` on `https://www.aliexpress.com/p/order/*`, auto-collects the
 `mtop.aliexpress.trade.buyer.order.list` JSON responses as you scroll, and gives
 you a floating button to download them as one JSON file.
 
+Page 1 of the order list is rendered **server-side** and never passes through
+`fetch`/`XHR`, so hooking alone silently misses the newest orders (the captured
+responses start at `pageIndex` 2). Since 0.2 the script also harvests the
+embedded page-1 state and records it in the same envelope as the API responses.
+If you are stuck on 0.1 (or the embedded-state harvest fails on a page
+redesign), force page 1 through the API instead: switch the status tab (e.g. to
+*Awaiting delivery* and back to *View all*) before downloading. The ingester
+prints a warning when a capture is missing page 1.
+
 ### Use
 
 1. Install in Tampermonkey (Firefox or Chromium): *Utilities → Install from

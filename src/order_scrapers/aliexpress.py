@@ -4,7 +4,10 @@ AliExpress can't be scraped headless (signed mtop gateway + anti-bot), so the
 capture happens inside the logged-in browser: the ``order-api-capture``
 userscript (see ``userscripts/``) hooks fetch/XHR on ``/p/order/*`` and downloads
 the raw ``mtop.aliexpress.trade.buyer.order.list`` JSON responses to one file.
-This module parses that file into clean per-order records.
+Page 1 of the list is rendered server-side and never hits fetch/XHR, so the
+userscript (>= 0.2) also harvests it from the page's embedded state; this module
+warns when a capture is paginated but page 1 is absent (the newest orders would
+silently be missing). It parses the capture file into clean per-order records.
 
 The order-list API already carries each order's line items with per-line prices
 and a real ``currencyCode``, so no order-detail fetch is needed. Old/expired
@@ -81,8 +84,8 @@ def abs_url(href: str | None) -> str | None:
     return href
 
 
-def iter_order_fields(capture: list[dict]) -> Iterator[dict]:
-    """Yield the raw ``pc_om_list_order`` field dicts from a capture file."""
+def iter_components(capture: list[dict], tag: str) -> Iterator[dict]:
+    """Yield the ``fields`` dicts of components with ``tag`` from order-list responses."""
     for entry in capture:
         if ORDER_LIST_API not in (entry.get("url") or ""):
             continue
@@ -93,10 +96,36 @@ def iter_order_fields(capture: list[dict]) -> Iterator[dict]:
         if not isinstance(components, dict):
             continue
         for comp in components.values():
-            if isinstance(comp, dict) and comp.get("tag") == "pc_om_list_order":
+            if isinstance(comp, dict) and comp.get("tag") == tag:
                 fields = comp.get("fields")
-                if isinstance(fields, dict) and fields.get("orderId"):
+                if isinstance(fields, dict):
                     yield fields
+
+
+def iter_order_fields(capture: list[dict]) -> Iterator[dict]:
+    """Yield the raw ``pc_om_list_order`` field dicts from a capture file."""
+    for fields in iter_components(capture, "pc_om_list_order"):
+        if fields.get("orderId"):
+            yield fields
+
+
+def page_indexes(capture: list[dict]) -> set[int]:
+    """The ``pageIndex`` values seen in the capture's ``pc_om_list_body`` components."""
+    return {
+        fields["pageIndex"]
+        for fields in iter_components(capture, "pc_om_list_body")
+        if isinstance(fields.get("pageIndex"), int)
+    }
+
+
+def missing_first_page(capture: list[dict]) -> bool:
+    """True when the capture is paginated but page 1 is absent.
+
+    AliExpress renders the first page of orders server-side, so a fetch/XHR-only
+    capture starts at page 2 and silently misses the newest orders.
+    """
+    pages = page_indexes(capture)
+    return bool(pages) and 1 not in pages
 
 
 def normalize_line(line: dict) -> dict:
@@ -190,9 +219,19 @@ def main() -> int:
     add_store_args(parser, cfg_path(cfg, "output", DEFAULT_OUTPUT))
     args = parser.parse_args()
 
-    records = parse_capture(load_capture(args.capture))
+    capture = load_capture(args.capture)
+    records = parse_capture(capture)
     if not records:
         sys.exit(f"error: no orders found in {args.capture}. Does it contain {ORDER_LIST_API} responses?")
+    if missing_first_page(capture):
+        print(
+            "warning: page 1 of the order list is not in the capture, so the newest "
+            "orders are missing. The first page is rendered server-side and never hits "
+            "fetch/XHR; on the order page, switch the status tab (e.g. to 'Awaiting "
+            "delivery' and back to 'View all') to force page 1 through the API, then "
+            "re-download the capture.",
+            file=sys.stderr,
+        )
     return store.sync(
         records,
         args.output,

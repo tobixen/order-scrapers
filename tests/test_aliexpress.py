@@ -65,3 +65,31 @@ def test_amount_parser_handles_format_price_info():
     assert ali.parse_amount("US $8.86|8|86") == 8.86
     assert ali.parse_amount(None, "€26.52") == 26.52
     assert ali.parse_amount(None, None) is None
+
+
+def _list_entry(page_index):
+    """A minimal order-list response for pagination tests."""
+    components = {
+        "list_body": {"tag": "pc_om_list_body", "fields": {"pageIndex": page_index, "pageSize": 10}},
+        "order_x": {"tag": "pc_om_list_order", "fields": {"orderId": f"order-p{page_index}"}},
+    }
+    return {
+        "url": f"//acs.aliexpress.com/h5/{ali.ORDER_LIST_API}/1.0/",
+        "status": 200,
+        "body": json.dumps({"data": {"data": components}}),
+    }
+
+
+def test_page_indexes():
+    assert ali.page_indexes([_list_entry(2), _list_entry(3)]) == {2, 3}
+    assert ali.page_indexes([_list_entry(1), _list_entry(2)]) == {1, 2}
+    # sanitized fixture carries no pc_om_list_body component
+    assert ali.page_indexes(_capture()) == set()
+
+
+def test_missing_first_page():
+    # page 1 is server-side rendered, so a fetch/XHR-only capture starts at 2
+    assert ali.missing_first_page([_list_entry(2), _list_entry(3)])
+    assert not ali.missing_first_page([_list_entry(1), _list_entry(2)])
+    # no pagination info at all: cannot tell, so no warning
+    assert not ali.missing_first_page(_capture())

@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         AliExpress Order API Capture
 // @namespace    http://tobixen.no/
-// @version      0.1
-// @description  Auto-capture the mtop order-API JSON responses on the AliExpress order pages (no DevTools needed). Adds a floating button to download everything captured, so we can see the real response shape and build a JSONL exporter from it.
+// @version      0.2
+// @description  Auto-capture the mtop order-API JSON responses on the AliExpress order pages (no DevTools needed). Also harvests the server-rendered first page from the page's embedded state — it never passes through fetch/XHR, so hooking alone silently misses the newest orders. Adds a floating button to download everything captured.
 // @match        https://www.aliexpress.com/p/order/*
 // @grant        GM_setClipboard
 // @run-at       document-start
@@ -76,6 +76,85 @@
         return origSend.apply(this, arguments);
     };
 
+    // --- server-rendered page 1 ---------------------------------------------
+    // Page 1 of the order list is rendered server-side and embedded in the
+    // page's initial state, so it never passes through fetch/XHR — hooking
+    // alone silently misses the newest orders (the captured responses start at
+    // pageIndex 2). Search the page globals for the component map that holds
+    // the pc_om_list_order entries and record it wrapped in the same
+    // {data:{data:components}} envelope as the real API responses, so the
+    // Python parser needs no changes.
+    var ssrDone = false;
+
+    function findOrderComponents(root) {
+        var visited = new Set();
+        var stack = [{ obj: root, depth: 0 }];
+        while (stack.length) {
+            var cur = stack.pop();
+            var obj = cur.obj;
+            if (!obj || typeof obj !== 'object' || visited.has(obj)) continue;
+            if (obj.nodeType) continue; // skip DOM nodes
+            visited.add(obj);
+            var keys;
+            try { keys = Object.keys(obj); } catch (e) { continue; }
+            for (var i = 0; i < keys.length; i++) {
+                var v;
+                try { v = obj[keys[i]]; } catch (e) { continue; }
+                if (v && typeof v === 'object' &&
+                    v.tag === 'pc_om_list_order' && v.fields) {
+                    return obj; // obj is the component map
+                }
+            }
+            if (cur.depth >= 8) continue;
+            for (var j = 0; j < keys.length; j++) {
+                var w;
+                try { w = obj[keys[j]]; } catch (e) { continue; }
+                if (w && typeof w === 'object') stack.push({ obj: w, depth: cur.depth + 1 });
+            }
+        }
+        return null;
+    }
+
+    function harvestSSR() {
+        if (ssrDone) return;
+        try {
+            var W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
+            // likely init-data globals first, then a full sweep of page globals
+            var names = ['runParams', '__INIT_DATA__', '_init_data_', '__INITIAL_STATE__', '__AER_DATA__'];
+            try { names = names.concat(Object.keys(W)); } catch (e) {}
+            for (var i = 0; i < names.length && !ssrDone; i++) {
+                var root;
+                try { root = W[names[i]]; } catch (e) { continue; }
+                if (!root || typeof root !== 'object') continue;
+                var comps = findOrderComponents(root);
+                if (!comps) continue;
+                try {
+                    record('ssr://mtop.aliexpress.trade.buyer.order.list/embedded-page-1',
+                           200, JSON.stringify({ data: { data: comps } }));
+                    ssrDone = true;
+                } catch (e) { /* cyclic state; fall through to raw scripts */ }
+            }
+            if (!ssrDone) {
+                // fallback: keep the raw inline scripts so the data at least
+                // lands in the capture for later shape analysis
+                var scripts = document.querySelectorAll('script:not([src])');
+                for (var k = 0; k < scripts.length; k++) {
+                    var text = scripts[k].textContent || '';
+                    if (text.indexOf('pc_om_list_order') !== -1) {
+                        record('ssr://inline-script', 200, text);
+                        ssrDone = true;
+                    }
+                }
+            }
+        } catch (e) { /* never break the page */ }
+    }
+
+    // the init-data global may only appear once the app has booted, so retry
+    function scheduleHarvest() {
+        harvestSSR();
+        [1000, 3000, 8000].forEach(function (ms) { setTimeout(harvestSSR, ms); });
+    }
+
     // --- UI ----------------------------------------------------------------
     var btn;
     function updateButton() {
@@ -105,6 +184,11 @@
         updateButton();
     }
 
-    if (document.body) addButton();
-    else document.addEventListener('DOMContentLoaded', addButton);
+    function boot() {
+        addButton();
+        scheduleHarvest();
+    }
+
+    if (document.body) boot();
+    else document.addEventListener('DOMContentLoaded', boot);
 })();
