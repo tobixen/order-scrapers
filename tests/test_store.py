@@ -1,5 +1,7 @@
 """Tests for the shared JSONL store: append/dedup/update-all/dry-run."""
 
+import pytest
+
 from order_scrapers import store
 
 
@@ -47,3 +49,16 @@ def test_dry_run_writes_nothing(tmp_path):
 def test_content_strips_bookkeeping_keys():
     rec = {"id": "1", "v": 2, "_source": "t", "_fetchedAt": "x"}
     assert store.content(rec) == {"id": "1", "v": 2}
+
+
+def test_write_text_atomic_keeps_the_old_file_when_the_rename_fails(tmp_path, monkeypatch):
+    path = tmp_path / "data.json"
+    path.write_text("old", encoding="utf-8")
+
+    def replace(self, target):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(type(path), "replace", replace)
+    with pytest.raises(OSError, match="disk full"):
+        store.write_text_atomic(path, "new")
+    assert path.read_text(encoding="utf-8") == "old"

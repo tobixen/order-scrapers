@@ -38,7 +38,26 @@ svb24-history --browser firefox
 decathlon-history --update-all
 aliexpress-history ~/Downloads/aliexpress-order-api-capture.json
 lidl-history --input ~/shopping-analyzer/lidl_receipts.json
+lidl-history --fetch --country bg      # run shopping-analyzer first, then ingest
 ```
+
+### Lidl
+
+Without `--fetch`, `lidl-history` ingests whatever `lidl_receipts.json` already
+holds. With it, [shopping-analyzer](https://github.com/tobixen/shopping-analyzer)
+is run first (spawned as a program — no code is imported from it) to refresh that
+file: log in to Lidl+ in the browser beforehand, since that is where the session
+cookies come from. `--analyzer` points at the checkout, `--python` at the
+interpreter its dependencies are installed for, and `--country` is required —
+shopping-analyzer defaults to Germany, and the wrong country's API answers "no
+receipts", which is indistinguishable from a good fetch with nothing new.
+
+The downloader runs in a scratch directory on a copy of your receipts file (its
+output path is relative to the working directory), so a crashed run cannot
+overwrite what you have. New receipts are appended and stamped; a receipt that
+came back different from the stored one is reported rather than rewritten, since
+it may carry hand corrections — `--update-all` takes the fetched copy, on both
+the raw file and the JSONL store.
 
 ### AliExpress capture
 
@@ -60,6 +79,12 @@ output = "~/regnskap/aliexpress-history.jsonl"
 [decathlon]
 browser = "firefox"
 country = "bg"
+
+[lidl]
+input = "~/regnskap/lidl_receipts.json"
+analyzer = "~/shopping-analyzer"
+country = "bg"
+browser = "chromium"
 ```
 
 ## License

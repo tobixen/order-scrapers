@@ -41,14 +41,17 @@ def content(rec: dict) -> dict:
     return {k: v for k, v in rec.items() if not k.startswith("_")}
 
 
-def write_records(path: Path, records: Iterable[dict]) -> None:
-    """Atomically (re)write the whole history file."""
+def write_text_atomic(path: Path, text: str) -> None:
+    """Replace *path* with *text* in one rename, so a failed write leaves the old file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    with tmp.open("w", encoding="utf-8") as fh:
-        for rec in records:
-            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    tmp.replace(path)  # atomic rewrite
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
+
+
+def write_records(path: Path, records: Iterable[dict]) -> None:
+    """Atomically (re)write the whole history file."""
+    write_text_atomic(path, "".join(json.dumps(rec, ensure_ascii=False) + "\n" for rec in records))
 
 
 def sync(
